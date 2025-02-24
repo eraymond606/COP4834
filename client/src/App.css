@@ -1,0 +1,71 @@
+.App {
+  text-align: center;
+  font-family: Arial, sans-serif;
+  background-color: #f6f6f6;
+  padding: 20px;
+}
+
+nav {
+  margin-bottom: 20px;
+}
+
+nav a {
+  color: #3b3b3b;
+  text-decoration: none;
+  margin: 0 10px;
+  font-weight: bold;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  background: #f6f6f6;
+  margin: 10px auto;
+  padding: 10px;
+  max-width: 400px;
+  border-radius: 5px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+form {
+  max-width: 400px;
+  margin: 20px auto;
+  background: #f6f6f6;
+  padding: 15px;
+  border-radius: 5px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+form div {
+  margin-bottom: 15px;
+}
+
+form label {
+  display: inline-block;
+  width: 100px;
+}
+
+form input {
+  width: calc(100% - 110px);
+  padding: 5px;
+}
+
+button {
+  padding: 10px 15px;
+  background-color: #3b3b3b;
+  color: #f6f6f6;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #555;
+}
