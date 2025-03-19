@@ -29,6 +29,72 @@ pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
 });
 
+async function executeQueryWithRetry(queryFn, maxRetries = 3) {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const client = await pool.connect();
+      try {
+        const result = await queryFn(client);
+        return result;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error(`Attempt ${i + 1} failed:`, error);
+      lastError = error;
+      if (i < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      }
+    }
+  }
+  throw lastError;
+}
+
+app.post('/admin/login', async (req, res) => {
+  console.log('Request body:', req.body);
+  try {
+    const { username, password } = req.body;
+    const numericPin = parseInt(username, 10);
+    console.log('Parsed admin_pin:', numericPin, 'Password:', password);
+
+    const text = `
+      SELECT *
+      FROM admin_login
+      WHERE admin_pin = $1
+        AND password = $2
+      LIMIT 1
+    `;
+
+    const values = [numericPin, password];
+    const result = await pool.query(text, values);
+    console.log(
+      'Query result rowCount:',
+      result.rowCount,
+      'Rows:',
+      result.rows
+    );
+
+    if (result.rowCount === 1) {
+      //Message and fake token
+      const token = 'abc123fakeToken';
+      return res.json({
+        token,
+        message: 'Login successful!',
+      });
+    } else {
+      return res.status(401).json({
+        message: 'Invalid username or password',
+      });
+    }
+  } catch (error) {
+    console.error('Error in /admin/login:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+//API Endpoint to get employees
+// Route to get all employees
 app.get('/api/employees', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -47,6 +113,7 @@ app.get('/api/employees', async (req, res) => {
   }
 });
 
+// Route to get all job codes
 app.get('/api/jobcodes', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -65,6 +132,7 @@ app.get('/api/jobcodes', async (req, res) => {
   }
 });
 
+// Route to get all employee-job code mappings
 app.get('/api/employee_job_codes', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -83,8 +151,11 @@ app.get('/api/employee_job_codes', async (req, res) => {
   }
 });
 
+//Insert employee records
 app.post('/api/employees', async (req, res) => {
   const { first_name, last_name, job_code_id } = req.body;
+
+  // Validate incoming data
   if (!first_name || !last_name || !job_code_id) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -92,6 +163,8 @@ app.post('/api/employees', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Insert the employee into the employees table
     const insertEmployeeQuery = `
       INSERT INTO employees (first_name, last_name)
       VALUES ($1, $2)
@@ -102,11 +175,14 @@ app.post('/api/employees', async (req, res) => {
       last_name,
     ]);
     const newPin = employeeResult.rows[0].pin;
+
+    // Assign that employee to the specified job code
     const insertEmployeeJobCodeQuery = `
       INSERT INTO employee_job_codes (pin, job_code_id)
       VALUES ($1, $2)
     `;
     await client.query(insertEmployeeJobCodeQuery, [newPin, job_code_id]);
+
     await client.query('COMMIT');
     res.status(201).json({ pin: newPin });
   } catch (error) {
@@ -118,17 +194,56 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
-// Serve static assets from the React app build
-app.use(express.static(path.join(__dirname, 'build')));
+// Delete employee job codes route
+app.delete('/api/employee_job_codes/:pin', async (req, res) => {
+  const { pin } = req.params;
+  const client = await pool.connect();
 
-// Catch-all: serve index.html for any other GET request (for React Router)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  try {
+    const deleteQuery = 'DELETE FROM employee_job_codes WHERE pin = $1';
+    const result = await client.query(deleteQuery, [pin]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Employee job codes not found.' });
+    }
+
+    res.json({ message: `Removed job codes for employee pin: ${pin}` });
+  } catch (error) {
+    console.error('Error deleting employee job codes:', error);
+    res
+      .status(500)
+      .json({ message: 'Server error deleting employee job codes' });
+  } finally {
+    client.release();
+  }
 });
 
-// Start the server using the environment's PORT or 5000 as fallback
-const PORT = process.env.PORT || 5000;
+app.delete('/api/employees/:pin', async (req, res) => {
+  const { pin } = req.params;
+  const client = await pool.connect();
+
+  try {
+    // First delete employee from "employees" table
+    const deleteEmployeeQuery = 'DELETE FROM employees WHERE pin = $1';
+    const result = await client.query(deleteEmployeeQuery, [pin]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Employee not found.' });
+    }
+
+    res.json({ message: `Employee with pin ${pin} deleted successfully.` });
+  } catch (error) {
+    console.error('Error deleting employee:', error);
+    res.status(500).json({ message: 'Server error deleting employee.' });
+  } finally {
+    client.release();
+  }
+});
+
+// Start the server
+const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
