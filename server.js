@@ -4,7 +4,10 @@ const app = express();
 const path = require('path');
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'https://cop4834-project-frontend.onrender.com'
+}));
+
 app.use(express.json());
 
 // API Endpoints
