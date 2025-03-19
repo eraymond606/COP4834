@@ -11,6 +11,11 @@ export default function EmployeeConfig() {
   const [selectedJobCodeId, setSelectedJobCodeId] = useState(null);
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
+  // For delete confirmation
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
+  // For trash icon animation
+  const [hoverTrashId, setHoverTrashId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -92,6 +97,48 @@ export default function EmployeeConfig() {
   function handleAddEmployeeClick(jobCodeId) {
     setSelectedJobCodeId(jobCodeId);
     setShowAddModal(true);
+  }
+  // Handle delete icon click
+  function handleDeleteClick(employee) {
+    setEmployeeToDelete(employee);
+    setShowDeleteModal(true);
+  }
+
+  // Handle confirm delete
+  async function handleConfirmDelete() {
+    try {
+      // Delete from employee_job_codes first
+      const deleteJobCodeRes = await fetch(
+        `https://cop4834-project-server.onrender.com/api/employee_job_codes/${employeeToDelete.pin}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!deleteJobCodeRes.ok) {
+        throw new Error('Failed to remove employee job codes');
+      }
+
+      // Then delete the employee
+      const deleteEmpRes = await fetch(
+        `https://cop4834-project-server.onrender.com/api/employees/${employeeToDelete.pin}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!deleteEmpRes.ok) {
+        throw new Error('Failed to delete employee');
+      }
+
+      // Close modal and refresh data
+      setShowDeleteModal(false);
+      setEmployeeToDelete(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      // Optionally show error to user
+    }
   }
 
   //POST to create the employee
@@ -190,13 +237,23 @@ export default function EmployeeConfig() {
                     </div>
                     <div style={{ ...styles.employeeCell, flex: 1 }} />
                     <div style={{ ...styles.employeeCell, flex: 1 }} />
-                    {/* Add Employee Button */}
-                    <button
-                      style={styles.addEmployeeButton}
-                      onClick={() => handleAddEmployeeClick(category.jobCodeId)}
+                    <div
+                      style={{
+                        width: '120px',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                      }}
                     >
-                      Add Employee+
-                    </button>
+                      {/* Add Employee Button */}
+                      <button
+                        style={styles.addEmployeeButton}
+                        onClick={() =>
+                          handleAddEmployeeClick(category.jobCodeId)
+                        }
+                      >
+                        Add Employee+
+                      </button>
+                    </div>
                   </div>
 
                   {category.employees.map((emp) => (
@@ -209,6 +266,19 @@ export default function EmployeeConfig() {
                       </div>
                       <div style={{ ...styles.employeeCell, flex: 1 }}>
                         {emp.jobCodes.join(', ')}
+                      </div>
+                      <div style={{ width: '50px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleDeleteClick(emp)}
+                          style={styles.trashButton}
+                          title="Remove employee"
+                          onMouseEnter={() => setHoverTrashId(emp.pin)}
+                          onMouseLeave={() => setHoverTrashId(null)}
+                        >
+                          <AnimatedTrashIcon
+                            isHovered={hoverTrashId === emp.pin}
+                          />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -259,9 +329,80 @@ export default function EmployeeConfig() {
           </div>
         </div>
       )}
+      {/* Modal for delete confirmation */}
+      {showDeleteModal && employeeToDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0 }}>Confirm Delete</h3>
+            <p>
+              Are you sure you want to remove {employeeToDelete.firstName}{' '}
+              {employeeToDelete.lastName}?
+            </p>
+
+            <div style={{ marginTop: '10px' }}>
+              <button style={styles.deleteButton} onClick={handleConfirmDelete}>
+                Delete
+              </button>
+              <button
+                style={styles.cancelButton}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+// Animated trash icon component
+const AnimatedTrashIcon = ({ isHovered }) => {
+  // Scale and color animation on hover
+  const iconStyle = {
+    transform: isHovered ? 'scale(1.2)' : 'scale(1)',
+    transition: 'all 0.2s ease-in-out',
+  };
+
+  const lidStyle = {
+    transformOrigin: '50% 5%',
+    transform: isHovered ? 'rotate(-10deg)' : 'rotate(0deg)',
+    transition: 'transform 0.3s ease-in-out',
+  };
+
+  return (
+    <div style={iconStyle}>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={isHovered ? '#ff0000' : '#ff4d4d'}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {/* Trash can lid with animation */}
+        <g style={lidStyle}>
+          <path d="M3 6h18"></path>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+        </g>
+
+        {/* Trash can body */}
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+
+        {/* Inner lines that appear on hover */}
+        {isHovered && (
+          <>
+            <path d="M10 10v8" strokeWidth="1.5"></path>
+            <path d="M14 10v8" strokeWidth="1.5"></path>
+          </>
+        )}
+      </svg>
+    </div>
+  );
+};
 
 const styles = {
   container: {
@@ -326,6 +467,8 @@ const styles = {
     display: 'flex',
     marginLeft: '10px',
     marginBottom: '5px',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   employeeCell: {
     color: '#3b3b3b',
@@ -356,6 +499,16 @@ const styles = {
     padding: '6px 12px',
     cursor: 'pointer',
     borderRadius: '4px',
+  },
+  trashButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Modal styles
   modalOverlay: {
@@ -391,6 +544,15 @@ const styles = {
     borderRadius: '4px',
     marginRight: '10px',
   },
+  deleteButton: {
+    backgroundColor: '#ff4d4d',
+    color: '#fff',
+    border: 'none',
+    padding: '8px 16px',
+    cursor: 'pointer',
+    borderRadius: '4px',
+    marginRight: '10px',
+  },
   cancelButton: {
     backgroundColor: '#ccc',
     border: 'none',
@@ -399,3 +561,4 @@ const styles = {
     borderRadius: '4px',
   },
 };
+
