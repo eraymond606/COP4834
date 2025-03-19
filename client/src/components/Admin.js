@@ -21,7 +21,7 @@ const AdminLogin = () => {
       const { token, message } = response.data;
       localStorage.setItem('authToken', token);
       alert(message || 'Login successful!');
-      // e.g. window.location.href = '/admin/dashboard';
+      window.location.href = '/ConfigOptions';
     } catch (error) {
       console.error('Login error:', error);
       alert('Invalid credentials. Please try again.');
@@ -123,3 +123,4 @@ const AdminLogin = () => {
 };
 
 export default AdminLogin;
+
