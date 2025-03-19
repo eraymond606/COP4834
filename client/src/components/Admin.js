@@ -13,7 +13,7 @@ const AdminLogin = () => {
     e.preventDefault();
     try {
       // Send credentials to the server
-      const response = await axios.post('https://cop4834-project-frontend.onrender.com/admin/login', {
+      const response = await axios.post('https://cop4834-project-server.onrender.com/admin/login', {
         username,
         password,
       });
