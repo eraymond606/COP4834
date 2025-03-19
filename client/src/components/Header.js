@@ -1,7 +1,7 @@
 import React from 'react';
 
 function Header() {
-  return <header>{/* <h1>Restaurant Management System</h1> */}</header>;
+  return null;
 }
 
-export default Header;
+export default App;
