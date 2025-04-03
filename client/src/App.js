@@ -6,6 +6,7 @@ import Configure from './components/ConfigOptions';
 import Orders from './components/Orders';
 import Admin from './components/Admin';
 import EmployeeConfig from './components/EmployeeConfig';
+import ProtectedRoute from './ProtectedRoute';
 import './App.css';
 
 function App() {
@@ -19,10 +20,23 @@ function App() {
         </nav> */}
         <Routes>
           <Route path="/" element={<Admin />} />
-          <Route path="/ConfigOptions" element={<Configure />} />
-          {/* <Route path="/orders" element={<Orders />} /> */}
           <Route path="/admin" element={<Admin />} />
-          <Route path="/EmployeeConfig" element={<EmployeeConfig />} />
+          <Route
+            path="/ConfigOptions"
+            element={
+              <ProtectedRoute>
+                <Configure />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/EmployeeConfig"
+            element={
+              <ProtectedRoute>
+                <EmployeeConfig />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
@@ -30,4 +44,3 @@ function App() {
 }
 
 export default App;
-
