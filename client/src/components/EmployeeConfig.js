@@ -11,11 +11,17 @@ export default function EmployeeConfig() {
   const [selectedJobCodeId, setSelectedJobCodeId] = useState(null);
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   // For delete confirmation
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   // For trash icon animation
   const [hoverTrashId, setHoverTrashId] = useState(null);
+  // Edit employee
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -98,10 +104,18 @@ export default function EmployeeConfig() {
     setSelectedJobCodeId(jobCodeId);
     setShowAddModal(true);
   }
+
   // Handle delete icon click
   function handleDeleteClick(employee) {
     setEmployeeToDelete(employee);
     setShowDeleteModal(true);
+  }
+
+  function handleEditClick(employee) {
+    setEmployeeToEdit(employee);
+    setEditFirstName(employee.firstName);
+    setEditLastName(employee.lastName);
+    setShowEditModal(true);
   }
 
   // Handle confirm delete
@@ -143,19 +157,21 @@ export default function EmployeeConfig() {
 
   //POST to create the employee
   async function handleCreateEmployee() {
+    if (selectedJobCodeId === 0 && newPassword.trim().length < 6) {
+      alert('Manager password must be at least 6 characters.');
+      return;
+    }
     try {
-      const response = await fetch(
-        'https://cop4834-project-server.onrender.com/api/employees',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            first_name: newFirstName,
-            last_name: newLastName,
-            job_code_id: selectedJobCodeId,
-          }),
-        }
-      );
+      const response = await fetch('https://cop4834-project-server.onrender.com/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: newFirstName,
+          last_name: newLastName,
+          job_code_id: selectedJobCodeId,
+          password: selectedJobCodeId === 0 ? newPassword : null,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error('Failed to create employee');
@@ -164,6 +180,7 @@ export default function EmployeeConfig() {
       // Clear modal state
       setNewFirstName('');
       setNewLastName('');
+      setNewPassword('');
       setShowAddModal(false);
 
       // Refresh data so the new employee appears in the list
@@ -171,6 +188,32 @@ export default function EmployeeConfig() {
     } catch (error) {
       console.error('Error creating employee:', error);
       // Optionally show an error message to the user
+    }
+  }
+
+  // Edit Employee
+  async function handleUpdateEmployee() {
+    try {
+      const response = await fetch(
+        `https://cop4834-project-server.onrender.com//api/employees/${employeeToEdit.pin}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            first_name: editFirstName,
+            last_name: editLastName,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to update employee');
+
+      setShowEditModal(false);
+      setEmployeeToEdit(null);
+      fetchData(); // refresh
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      alert('Could not update employee');
     }
   }
 
@@ -216,6 +259,7 @@ export default function EmployeeConfig() {
               <div style={{ ...styles.headerCell, flex: 1 }}>Name</div>
               <div style={{ ...styles.headerCell, flex: 1 }}>Emp. Number</div>
               <div style={{ ...styles.headerCell, flex: 1 }}>Jobs</div>
+              <div style={{ ...styles.headerCell, width: '50px' }}></div>
             </div>
 
             {groupedData.map((category) => {
@@ -258,9 +302,18 @@ export default function EmployeeConfig() {
 
                   {category.employees.map((emp) => (
                     <div key={emp.pin} style={styles.employeeRow}>
-                      <div style={{ ...styles.employeeCell, flex: 1 }}>
+                      <div
+                        style={{
+                          ...styles.employeeCell,
+                          flex: 1,
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => handleEditClick(emp)}
+                        title="Click to edit name"
+                      >
                         {emp.firstName} {emp.lastName}
                       </div>
+
                       <div style={{ ...styles.employeeCell, flex: 1 }}>
                         {emp.pin}
                       </div>
@@ -311,6 +364,17 @@ export default function EmployeeConfig() {
                 style={styles.inputField}
               />
             </label>
+            {selectedJobCodeId === 0 && (
+              <label>
+                Manager Password:
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={styles.inputField}
+                />
+              </label>
+            )}
 
             <div style={{ marginTop: '10px' }}>
               <button
@@ -329,6 +393,7 @@ export default function EmployeeConfig() {
           </div>
         </div>
       )}
+
       {/* Modal for delete confirmation */}
       {showDeleteModal && employeeToDelete && (
         <div style={styles.modalOverlay}>
@@ -353,9 +418,49 @@ export default function EmployeeConfig() {
           </div>
         </div>
       )}
+      {showEditModal && employeeToEdit && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0 }}>Edit Employee</h3>
+            <label>
+              First Name:
+              <input
+                type="text"
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                style={styles.inputField}
+              />
+            </label>
+            <label>
+              Last Name:
+              <input
+                type="text"
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                style={styles.inputField}
+              />
+            </label>
+            <div style={{ marginTop: '10px' }}>
+              <button
+                style={styles.createButton}
+                onClick={handleUpdateEmployee}
+              >
+                Save
+              </button>
+              <button
+                style={styles.cancelButton}
+                onClick={() => setShowEditModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 // Animated trash icon component
 const AnimatedTrashIcon = ({ isHovered }) => {
   // Scale and color animation on hover
@@ -561,4 +666,3 @@ const styles = {
     borderRadius: '4px',
   },
 };
-
