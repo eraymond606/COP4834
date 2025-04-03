@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt');
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -10,7 +11,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// API Endpoints
+//Database setup
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -61,16 +62,13 @@ app.post('/admin/login', async (req, res) => {
     const numericPin = parseInt(username, 10);
     console.log('Parsed admin_pin:', numericPin, 'Password:', password);
 
-    const text = `
-      SELECT *
-      FROM admin_login
-      WHERE admin_pin = $1
-        AND password = $2
-      LIMIT 1
-    `;
-
-    const values = [numericPin, password];
-    const result = await pool.query(text, values);
+    // Get the stored hashed password
+    const query = `
+          SELECT * FROM admin_login
+          WHERE admin_pin = $1
+          LIMIT 1
+        `;
+    const result = await pool.query(query, [numericPin]);
     console.log(
       'Query result rowCount:',
       result.rowCount,
@@ -78,18 +76,24 @@ app.post('/admin/login', async (req, res) => {
       result.rows
     );
 
-    if (result.rowCount === 1) {
-      //Message and fake token
-      const token = 'abc123fakeToken';
-      return res.json({
-        token,
-        message: 'Login successful!',
-      });
-    } else {
-      return res.status(401).json({
-        message: 'Invalid username or password',
-      });
+    if (result.rowCount === 0) {
+      console.log('No user found with that PIN');
+      return res.status(401).json({ message: 'Invalid username or password' });
     }
+
+    const user = result.rows[0];
+
+    // Compare password with hashed version
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      console.log('Password does not match');
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    const token = 'abc123fakeToken';
+    console.log('Login successful');
+    return res.json({ token, message: 'Login successful!' });
   } catch (error) {
     console.error('Error in /admin/login:', error);
     return res.status(500).json({ message: 'Server error' });
@@ -99,6 +103,7 @@ app.post('/admin/login', async (req, res) => {
 //API Endpoint to get employees
 // Route to get all employees
 app.get('/api/employees', async (req, res) => {
+  console.log('Incoming request body:', req.body);
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -156,10 +161,10 @@ app.get('/api/employee_job_codes', async (req, res) => {
 
 //Insert employee records
 app.post('/api/employees', async (req, res) => {
-  const { first_name, last_name, job_code_id } = req.body;
+  const { first_name, last_name, job_code_id, password } = req.body;
 
   // Validate incoming data
-  if (!first_name || !last_name || !job_code_id) {
+  if (!first_name || !last_name || typeof job_code_id !== 'number') {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -185,6 +190,15 @@ app.post('/api/employees', async (req, res) => {
       VALUES ($1, $2)
     `;
     await client.query(insertEmployeeJobCodeQuery, [newPin, job_code_id]);
+
+    if (job_code_id === 0 && password) {
+      const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash password
+      const insertAdminQuery = `
+        INSERT INTO admin_login (admin_pin, password)
+        VALUES ($1, $2)
+      `;
+      await client.query(insertAdminQuery, [newPin, hashedPassword]);
+    }
 
     await client.query('COMMIT');
     res.status(201).json({ pin: newPin });
@@ -243,10 +257,43 @@ app.delete('/api/employees/:pin', async (req, res) => {
   }
 });
 
+// Edit employee
+app.put('/api/employees/:pin', async (req, res) => {
+  const { pin } = req.params;
+  const { first_name, last_name } = req.body;
+
+  if (!first_name || !last_name) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const client = await pool.connect();
+  try {
+    const updateQuery = `
+      UPDATE employees
+      SET first_name = $1, last_name = $2
+      WHERE pin = $3
+    `;
+    const result = await client.query(updateQuery, [
+      first_name,
+      last_name,
+      pin,
+    ]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Employee not found.' });
+    }
+
+    res.json({ message: 'Employee updated successfully.' });
+  } catch (error) {
+    console.error('Error updating employee:', error);
+    res.status(500).json({ error: 'Failed to update employee' });
+  } finally {
+    client.release();
+  }
+});
+
 // Start the server
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-
