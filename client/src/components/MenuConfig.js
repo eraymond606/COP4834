@@ -85,9 +85,9 @@ export default function MenuConfig() {
     try {
       const [catsRes, ingRes, itemsRes, linksRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/menu_categories`),
-      fetch(`${API_BASE_URL}/api/ingredients`),
-      fetch(`${API_BASE_URL}/api/menu_items`),
-      fetch(`${API_BASE_URL}/api/menu_item_ingredients`),
+        fetch(`${API_BASE_URL}/api/ingredients`),
+        fetch(`${API_BASE_URL}/api/menu_items`),
+        fetch(`${API_BASE_URL}/api/menu_item_ingredients`),
       ]);
       if (!catsRes.ok || !ingRes.ok || !itemsRes.ok || !linksRes.ok) {
         throw new Error('One or more API calls failed');
@@ -147,7 +147,7 @@ export default function MenuConfig() {
       .filter(Boolean);
 
     // 1) Create the menu item + receive its food_id
-    const res = await fetch('${API_BASE_URL}/api/menu_items', {
+    const res = await fetch(`${API_BASE_URL}/api/menu_items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -173,15 +173,15 @@ export default function MenuConfig() {
 
   async function handleConfirmDelete() {
     // first remove ingredient links
-    await (`${API_BASE_URL}/api/menu_item_ingredients/by-item/${itemToDelete.food_id}`, {
+    await fetch(`${API_BASE_URL}/api/menu_item_ingredients/by-item/${itemToDelete.food_id}`, {
       method: 'DELETE',
     });
     // then the item itself
-    await (`${API_BASE_URL}/api/menu_items/${itemToDelete.food_id}`, {
+    await fetch(`${API_BASE_URL}/api/menu_items/${itemToDelete.food_id}`, {
       method: 'DELETE',
     });
     setShowDeleteModal(false);
-    Data();
+    fetchData();
   }
 
   // Edit
@@ -202,7 +202,7 @@ export default function MenuConfig() {
       .filter(Boolean);
 
     // update name, category & price
-    await (`${API_BASE_URL}/api/menu_items/${itemToEdit.food_id}`, {
+    await fetch(`${API_BASE_URL}/api/menu_items/${itemToEdit.food_id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -213,7 +213,7 @@ export default function MenuConfig() {
       }),
     });
     setShowEditModal(false);
-    Data();
+    fetchData();
   }
 
   const handleBackClick = () => navigate('/ConfigOptions');
