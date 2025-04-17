@@ -26,7 +26,7 @@ export default function ManagementScreen() {
       </h1>
       <h2 style={styles.title2}>Management</h2>
       <button style={styles.backButton} onClick={handleBackClick}>
-        Back
+        Log out
       </button>
 
       {/* Buttons */}
@@ -67,7 +67,7 @@ const styles = {
     position: 'absolute',
     top: '40px',
     left: '40px',
-    backgroundColor: '#45A8DA',
+    backgroundColor: '#b30000',
     color: '#fff',
     border: 'none',
     padding: '8px 16px',
