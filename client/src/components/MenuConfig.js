@@ -1,6 +1,7 @@
 // src/components/MenuConfig.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config/api.js';
 
 // Reuse your AnimatedTrashIcon or import it if you factored it out
 const AnimatedTrashIcon = ({ isHovered }) => {
@@ -83,10 +84,10 @@ export default function MenuConfig() {
     setError(null);
     try {
       const [catsRes, ingRes, itemsRes, linksRes] = await Promise.all([
-        fetch('/api/menu_categories'),
-        fetch('/api/ingredients'),
-        fetch('/api/menu_items'),
-        fetch('/api/menu_item_ingredients'),
+        fetch(`${API_BASE_URL}/api/menu_categories`),
+      fetch(`${API_BASE_URL}/api/ingredients`),
+      fetch(`${API_BASE_URL}/api/menu_items`),
+      fetch(`${API_BASE_URL}/api/menu_item_ingredients`),
       ]);
       if (!catsRes.ok || !ingRes.ok || !itemsRes.ok || !linksRes.ok) {
         throw new Error('One or more API calls failed');
