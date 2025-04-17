@@ -1,7 +1,7 @@
 // src/components/MenuConfig.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API_BASE_URL from './api.js';
+import API_BASE_URL from './Api.js';
 
 // Reuse your AnimatedTrashIcon or import it if you factored it out
 const AnimatedTrashIcon = ({ isHovered }) => {
