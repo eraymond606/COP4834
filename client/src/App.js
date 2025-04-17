@@ -7,6 +7,7 @@ import Orders from './components/Orders';
 import Admin from './components/Admin';
 import EmployeeConfig from './components/EmployeeConfig';
 import ProtectedRoute from './ProtectedRoute';
+import MenuConfig from './components/MenuConfig';
 import './App.css';
 
 function App() {
@@ -34,6 +35,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <EmployeeConfig />
+              </ProtectedRoute>
+            }
+          />
+<Route
+            path="/MenuConfig"
+            element={
+              <ProtectedRoute>
+                <MenuConfig />
               </ProtectedRoute>
             }
           />
