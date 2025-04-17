@@ -291,6 +291,224 @@ app.put('/api/employees/:pin', async (req, res) => {
     client.release();
   }
 });
+// ─── MENU CATEGORIES ─────────────────────────────────────────────────────────
+app.get('/api/menu_categories', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT category_id, category_name FROM menu_categories'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching menu categories:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── INGREDIENTS ─────────────────────────────────────────────────────────────
+app.get('/api/ingredients', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT ingredient_id, ingredient_name FROM ingredients'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching ingredients:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── MENU ITEMS ──────────────────────────────────────────────────────────────
+// List all items
+app.get('/api/menu_items', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT food_id, item_name, category_id, price FROM menu_items'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching menu items:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// CREATE a menu item + upsert ingredients + link them
+app.post('/api/menu_items', async (req, res) => {
+  const { item_name, category_id, ingredient_names, price } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1) insert menu_items with price
+    const itemResult = await client.query(
+      `INSERT INTO menu_items (item_name, category_id, price)
+       VALUES ($1, $2, $3) RETURNING food_id`,
+      [item_name, category_id, price]
+    );
+    const food_id = itemResult.rows[0].food_id;
+
+    // 2) for each tag: find or create ingredient, then link
+    for (let name of ingredient_names) {
+      // a) check existing
+      let ingRes = await client.query(
+        `SELECT ingredient_id
+           FROM ingredients
+          WHERE ingredient_name = $1
+          LIMIT 1`,
+        [name]
+      );
+      let ingredient_id;
+      if (ingRes.rowCount) {
+        ingredient_id = ingRes.rows[0].ingredient_id;
+      } else {
+        // b) insert new
+        const newIng = await client.query(
+          `INSERT INTO ingredients (ingredient_name)
+           VALUES ($1)
+           RETURNING ingredient_id`,
+          [name]
+        );
+        ingredient_id = newIng.rows[0].ingredient_id;
+      }
+
+      // c) link it
+      await client.query(
+        `INSERT INTO menu_item_ingredients (food_id, ingredient_id)
+         VALUES ($1, $2)`,
+        [food_id, ingredient_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ food_id });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error creating menu item + ingredients:', err);
+    res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Update item (name, category, ingredients, and price)
+app.put('/api/menu_items/:food_id', async (req, res) => {
+  const { food_id } = req.params;
+  const { item_name, category_id, ingredient_names, price } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE menu_items
+         SET item_name=$1, category_id=$2, price=$3
+       WHERE food_id=$4`,
+      [item_name, category_id, price, food_id]
+    );
+
+    // remove old links
+    await client.query('DELETE FROM menu_item_ingredients WHERE food_id=$1', [
+      food_id,
+    ]);
+
+    // Re-insert new ingredients (similar to the create route)
+    for (let name of ingredient_names) {
+      // check existing
+      let ingRes = await client.query(
+        `SELECT ingredient_id
+         FROM ingredients
+         WHERE ingredient_name = $1
+         LIMIT 1`,
+        [name]
+      );
+      let ingredient_id;
+      if (ingRes.rowCount) {
+        ingredient_id = ingRes.rows[0].ingredient_id;
+      } else {
+        // insert new
+        const newIng = await client.query(
+          `INSERT INTO ingredients (ingredient_name)
+           VALUES ($1)
+           RETURNING ingredient_id`,
+          [name]
+        );
+        ingredient_id = newIng.rows[0].ingredient_id;
+      }
+
+      // link it
+      await client.query(
+        `INSERT INTO menu_item_ingredients (food_id, ingredient_id)
+         VALUES ($1, $2)`,
+        [food_id, ingredient_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'Menu item updated' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating menu item:', err);
+    res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete a menu item
+app.delete('/api/menu_items/:food_id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM menu_items WHERE food_id=$1', [
+      req.params.food_id,
+    ]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    console.error('Error deleting menu item:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── MENU ITEM INGREDIENTS ───────────────────────────────────────────────────
+// List all links
+app.get('/api/menu_item_ingredients', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT food_id, ingredient_id FROM menu_item_ingredients'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching item–ingredient links:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete all links for one item
+app.delete('/api/menu_item_ingredients/by-item/:food_id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM menu_item_ingredients WHERE food_id=$1', [
+      req.params.food_id,
+    ]);
+    res.json({ message: 'Links removed' });
+  } catch (err) {
+    console.error('Error deleting links:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Create a new link
+app.post('/api/menu_item_ingredients', async (req, res) => {
+  const { food_id, ingredient_id } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO menu_item_ingredients (food_id, ingredient_id)
+       VALUES ($1, $2)`,
+      [food_id, ingredient_id]
+    );
+    res.status(201).json({ message: 'Linked' });
+  } catch (err) {
+    console.error('Error linking ingredient:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // Start the server
 const PORT = 5000;
